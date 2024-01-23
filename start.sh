@@ -1,29 +1,31 @@
 #!/bin/bash
 
-# The complete path of PalServer.sh
+# PalServer.sh 的完整路径
 PAL_SERVER_SCRIPT_PATH="/home/steam/Steam/steamapps/common/PalServer/PalServer.sh"
 
-# URL to send a request
+# 要发送GET请求的URL
 WECOM_URL="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key={wecomkey}"
 IPHONE_URL="https://api.day.app/{barkkey}/PalWorld/"
 
-# Available memory limit (unit: MB), here is 0.5GB.
+# 可用内存限制（单位：MB），这里是0.5GB
 MEM_LIMIT=500
 
-# PID of the script
+# 脚本的PID
 PAL_SERVER_PID=""
 
 
-# The function to start the PalServer.sh script.
+# 启动 PalServer.sh 脚本的函数
 start_pal_server() {
-    # Run PalServer.sh in the background as a steam user.
+    # 以steam用户身份在后台运行PalServer.sh
     sudo -u steam bash "$PAL_SERVER_SCRIPT_PATH" &
-    # Get the PID of the last process put into the background.
+    # 获取最后一个放入后台的进程的PID
     PAL_SERVER_PID=$!
-    echo "PalServer.sh started with PID: $PAL_SERVER_PID"
+    echo "PalServer.sh started"
+    send_wechat_message "Start PalServer"
+    send_iphone_message "Start%20PalServer"
 }
 
-# Function to send messages to WeCom
+# 发送消息到微信企业号的函数
 send_wechat_message() {
     local message=$1
     local json_data=$(cat <<EOF
@@ -42,7 +44,7 @@ EOF
     echo "Message sent to WeChat: $message"
 }
 
-# Function to send messages to iPhone
+# 发送消息到iPhone的函数
 send_iphone_message() {
     local message=$1
     local icon="?icon=https://ffffourwood.cn/usr/uploads/2023/10/584a5ab299ad6a033021f2c6bd8d7b22.JPG"
@@ -52,44 +54,44 @@ send_iphone_message() {
     echo "Message sent to iPhone: $message"
 }
 
-# Function to check memory and restart
+# 检查内存并重启的函数
 check_and_restart() {
-    # Get the available memory of the entire system (unit: MB)
+    # 获取整个系统的可用内存（单位：MB）
     AVAILABLE_MEM=$(free -m | awk '/^Mem:/{print $7}')
     echo "Available Memory - ${AVAILABLE_MEM}MB..."
-    # If the available memory is below the limit, restart PalServer.sh.
+    # 如果可用内存低于限制，则重启PalServer.sh
     if [ "$AVAILABLE_MEM" -lt "$MEM_LIMIT" ]; then
         echo "Memory limit exceeded: Available - ${AVAILABLE_MEM}MB, Limit - ${MEM_LIMIT}MB. Restarting PalServer.sh..."
-        sudo kill "$PAL_SERVER_PID" 2>/dev/null
+        sudo pkill -f PalServer-Linux 2>/dev/null
+        # 发送消息
+        send_wechat_message "Memory limit exceeded, kill PalServer-Linux}"
+        send_iphone_message "Memory%20limit%20exceeded%20kill%20PalServer-Linux}"
+        sleep 30
         start_pal_server
-        # Send message
-        send_wechat_message "Memory limit exceeded, restarting PalServer"
-        send_iphone_message "Memory%20limit%20exceeded,%20restarting%20PalServer"
     fi
 }
 
 
-# First start PalServer.sh
+# 首次启动 PalServer.sh
 start_pal_server
 echo "PalServer started"
-send_wechat_message "Start PalServer"
-send_iphone_message "Start%20PalServer"
 
-# Set up an infinite loop.
+# 设置一个无限循环
 while true; do
-    # Check the memory every minute.
+    # 每隔一分钟检查一次内存
     check_and_restart
     sleep 60
     echo "time interval running..."
-    # Restart PalServer.sh every four hours.
+    # 每四个小时重启一次PalServer.sh
     if ((SECONDS >= 14400)); then
         echo "Four hours passed. Restarting PalServer.sh..."
-        sudo kill "$PAL_SERVER_PID" 2>/dev/null
-        start_pal_server
-        # Send message.
+        sudo pkill -f PalServer-Linux 2>/dev/null
+        # 发送消息
         send_wechat_message "Four hours passed, restarting PalServer"
         send_iphone_message "Four%20hours%20passed,%20restarting%20PalServer"
-        # Reset stopwatch.
+        sleep 30
+        start_pal_server
+        # 重置秒表
         SECONDS=0
     fi
 done
